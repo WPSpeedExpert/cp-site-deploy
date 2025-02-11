@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.9
+# Version:          1.1.0
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -148,25 +148,15 @@ check_dns() {
     elif [ "$domain_ip" != "$server_ipv4" ] && [ "$domain_ip" != "$server_ipv6" ]; then
         echo "⚠️  Warning: DNS record mismatch detected"
         echo "Domain IP: $domain_ip"
-        echo "Server IPv4: $server_ipv4"
-        [ ! -z "$server_ipv6" ] && echo "Server IPv6: $server_ipv6"
         echo ""
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
-        echo "Otherwise, please update your DNS records:"
+        echo "Otherwise, please update your DNS record:"
         echo ""
-        echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
         echo "Value: $server_ipv4"
         echo ""
-        if [ ! -z "$server_ipv6" ]; then
-            echo "For IPv6 (optional):"
-            echo "Type: AAAA"
-            echo "Name: $domain"
-            echo "Value: $server_ipv6"
-            echo ""
-        fi
-        echo "Note: Either IPv4 or IPv6 record is sufficient"
+        echo "Note: Only IPv4 record is required"
         echo ""
         while true; do
             read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
@@ -277,12 +267,24 @@ main_installation() {
     echo "1) Generic PHP"
     echo "2) WordPress"
     echo "3) WooCommerce"
-    read -p "Choose template (1-3, default: 1): " template_choice
+    echo "4) Show all available templates"
+    read -p "Choose template (1-4, default: 1): " template_choice
 
     case ${template_choice:-1} in
         1) VHOST_TEMPLATE="Generic" ;;
         2) VHOST_TEMPLATE="WordPress" ;;
         3) VHOST_TEMPLATE="WooCommerce" ;;
+        4)
+            echo ""
+            echo "Available templates:"
+            echo "-------------------"
+            clpctl vhost-templates:list
+            echo ""
+            read -p "Enter template name exactly as shown above: " VHOST_TEMPLATE
+            if ! clpctl vhost-templates:list | grep -q "^| $VHOST_TEMPLATE "; then
+                error_exit "Invalid template name"
+            fi
+            ;;
         *) error_exit "Invalid template selection" ;;
     esac
     
