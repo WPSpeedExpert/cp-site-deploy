@@ -30,7 +30,11 @@ trap cleanup EXIT
 # 1. SCRIPT CONFIGURATION
 #===============================================
 # Exit on error, undefined vars, and pipe failures
-set -euo pipefail
+# set -euo pipefail
+
+# Allow script to continue on errors for DNS check
+set +e  # Temporarily disable exit on error
+trap 'set -e' RETURN  # Re-enable exit on error when function returns
 
 # Get server IP
 SERVER_IP=$(curl -s ifconfig.me)
@@ -119,7 +123,6 @@ domain_exists() {
 #---------------------------------------
 check_dns() {
     local domain=$1
-    local dns_check_passed=false
     local domain_ip=$(dig +short "$domain" | grep -v "\.$" | head -n1)
     local server_ipv4=$(curl -s4 ifconfig.me)
     local server_ipv6=$(curl -s6 ifconfig.me)
@@ -173,23 +176,18 @@ check_dns() {
             case $dns_override in
                 [Yy]*)
                     log_message "Proceeding with installation despite DNS mismatch..."
-                    dns_check_passed=true
-                    break
+                    return 0
                     ;;
                 [Nn]*|"")
-                    echo "Installation aborted. Please verify DNS settings and try again."
-                    return 1
+                    error_exit "DNS check failed and user aborted installation"
                     ;;
                 *)
                     echo "Please answer y or n."
                     ;;
             esac
         done
-    else
-        dns_check_passed=true
     fi
-
-    $dns_check_passed && return 0 || return 1
+    return 0
 }
 
 #===============================================
@@ -302,23 +300,28 @@ main_installation() {
 # 5.4 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
-    if ! check_dns "$domain"; then
-        error_exit "DNS check failed. Please fix DNS records and try again."
-    fi
-
+    check_dns "$domain"
+    
+    # Continue with site creation
     log_message "Starting site creation..."
 
-    # 5.5 Generate Credentials
-    #---------------------------------------
-    site_user=$(derive_siteuser "$domain")
-    site_pass=$(generate_password)
-    db_name=$site_user
-    db_user=$site_user
-    db_pass=$(generate_password)
+        # 5.5 Generate Credentials
+        #---------------------------------------
+        site_user=$(derive_siteuser "$domain")
+        site_pass=$(generate_password)
+        db_name=$site_user
+        db_user=$site_user
+        db_pass=$(generate_password)
 
-    # 5.6 Create Site
-    #---------------------------------------
-    log_message "Creating PHP site for $domain..."
+        # 5.6 Create Site
+        log_message "Creating PHP site for $domain..."
+        clpctl site:add:php \
+            --domainName="$domain" \
+            --phpVersion="$PHP_VERSION" \
+            --vhostTemplate="Generic" \
+            --siteUser="$site_user" \
+            --siteUserPassword="$site_pass" \
+            || error_exit "Failed to create site"
 
     # Create site in CloudPanel
     clpctl site:add:php \
