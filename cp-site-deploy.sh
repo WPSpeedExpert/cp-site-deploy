@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.1
+# Version:          1.0.2
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -124,10 +124,18 @@ check_dns() {
     if [ -z "$domain_ip" ]; then
         echo "⚠️  No DNS record found for $domain"
         echo ""
-        echo "Please add an A record in your DNS settings:"
+        echo "Please add DNS records in your DNS settings:"
+        echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
-        echo "IPv4: $SERVER_IP"
+        echo "Value: $SERVER_IP"
+        echo ""
+        echo "For IPv6 (if supported):"
+        echo "Type: AAAA"
+        echo "Name: $domain"
+        echo "Value: $(ip -6 addr show | grep inet6 | grep -v fe80 | awk '{print $2}' | cut -d'/' -f1 | head -n1)"
+        echo ""
+        echo "Note: Either IPv4 or IPv6 record is sufficient"
         echo ""
         read -p "Press Enter to retry DNS check or Ctrl+C to exit..."
         check_dns "$domain"
@@ -137,10 +145,18 @@ check_dns() {
         echo "Server IP: $SERVER_IP"
         echo ""
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
-        echo "Otherwise, please update your DNS A record:"
+        echo "Otherwise, please update your DNS records:"
+        echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
-        echo "IPv4: $SERVER_IP"
+        echo "Value: $SERVER_IP"
+        echo ""
+        echo "For IPv6 (if supported):"
+        echo "Type: AAAA"
+        echo "Name: $domain"
+        echo "Value: $(ip -6 addr show | grep inet6 | grep -v fe80 | awk '{print $2}' | cut -d'/' -f1 | head -n1)"
+        echo ""
+        echo "Note: Either IPv4 or IPv6 record is sufficient"
         echo ""
         read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
         case $dns_override in
