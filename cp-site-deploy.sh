@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.3
+# Version:          1.0.4
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -169,15 +169,16 @@ check_dns() {
         case $dns_override in
             [Yy]*)
                 log_message "Proceeding with installation despite DNS mismatch..."
+                return 2  # Special return code for user override
                 ;;
             *)
                 echo "Installation aborted. Please verify DNS settings and try again."
-                exit 0
+                return 1  # Error return code
                 ;;
         esac
     fi
+    return 0  # Success return code
 }
-
 #===============================================
 # 4. CREDENTIALS MANAGEMENT
 #===============================================
