@@ -2,9 +2,9 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.8
+# Version:          1.0.9
 # Author:           OctaHexa Media LLC
-# Last Modified:    2025-02-11
+# Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
 #
 # Installation:     Run this one-line command:
@@ -203,25 +203,25 @@ generate_credentials() {
     local creds_file="/home/$site_user/site_credentials.txt"
 
     cat > "$creds_file" << EOF
-Site Information
---------------
-IP Address:   $SERVER_IP
-Domain:       https://$domain
-Site User:    $site_user
-Password:     $site_pass
+Site 
+- - - - - - - - - - - - - -
+IP Address IPv4: $server_ipv4
+IP Address IPv6: $SERVER_IP
+Domain Name: https://$domain
+Site User: $site_user
+Password: $site_pass
 
-Database Access
---------------
-Host:         127.0.0.1
-Port:         3306
-DB Name:      $db_name
-DB User:      $db_user
-DB Password:  $db_pass
+Database 
+- - - - - - - - - - - - - -
+Host: 127.0.0.1
+Port: 3306
+Database Name: $db_name
+Database User Name: $db_user
+Database User Password: $db_pass
+- - - - - - - - - - - - - -
 
-Additional Information
---------------
-Install Date: $(date '+%Y-%m-%d %H:%M:%S')
-Doc Root:     /home/$site_user/htdocs/$domain
+Installation Date: $(date '+%Y-%m-%d %H:%M:%S')
+Document Root: /home/$site_user/htdocs/$domain
 EOF
 
     chown "$site_user:$site_user" "$creds_file"
@@ -229,7 +229,7 @@ EOF
 
     # Display credentials on screen
     echo "Site Credentials"
-    echo "--------------"
+    echo "- - - - - - - - - - - - - -"
     cat "$creds_file"
     echo ""
     echo "Credentials saved to: $creds_file"
@@ -270,7 +270,23 @@ main_installation() {
         fi
     fi
 
-    # 5.2 Domain Input
+    # 5.2 VHost Template Selection
+    #---------------------------------------
+    echo ""
+    echo "Select VHost template:"
+    echo "1) Generic PHP"
+    echo "2) WordPress"
+    echo "3) WooCommerce"
+    read -p "Choose template (1-3, default: 1): " template_choice
+
+    case ${template_choice:-1} in
+        1) VHOST_TEMPLATE="Generic" ;;
+        2) VHOST_TEMPLATE="WordPress" ;;
+        3) VHOST_TEMPLATE="WooCommerce" ;;
+        *) error_exit "Invalid template selection" ;;
+    esac
+    
+    # 5.3 Domain Input
     #---------------------------------------
     while true; do
         read -p "Enter domain (e.g., www.example.com): " domain
@@ -280,7 +296,7 @@ main_installation() {
         echo "Invalid domain format. Please try again."
     done
 
-    # 5.3 Domain Existence Check
+    # 5.4 Domain Existence Check
     #---------------------------------------
     if domain_exists "$domain"; then
         echo "Domain $domain already exists."
@@ -297,7 +313,7 @@ main_installation() {
         esac
     fi
 
-    # 5.4 DNS Check
+    # 5.5 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
@@ -305,7 +321,7 @@ main_installation() {
     # Continue with site creation
     log_message "Starting site creation..."
 
-    # 5.5 Generate Credentials
+    # 5.6 Generate Credentials
     #---------------------------------------
     site_user=$(derive_siteuser "$domain")
     site_pass=$(generate_password)
@@ -313,18 +329,17 @@ main_installation() {
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 5.6 Create Site
+    # 5.7 Create Site
     #---------------------------------------
-    log_message "Creating PHP site for $domain..."
     clpctl site:add:php \
         --domainName="$domain" \
         --phpVersion="$PHP_VERSION" \
-        --vhostTemplate="Generic" \
+        --vhostTemplate="$VHOST_TEMPLATE" \
         --siteUser="$site_user" \
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
 
-    # 5.7 Create Database
+    # 5.8 Create Database
     #---------------------------------------
     log_message "Creating database..."
     clpctl db:add \
@@ -334,13 +349,13 @@ main_installation() {
         --databaseUserPassword="$db_pass" \
         || error_exit "Failed to create database"
 
-    # 5.8 Install SSL Certificate
+    # 5.9 Install SSL Certificate
     #---------------------------------------
     log_message "Installing SSL certificate..."
     clpctl lets-encrypt:install:certificate --domainName="$domain" \
         || error_exit "Failed to install SSL certificate"
 
-    # 5.9 Generate Credentials File
+    # 5.10 Generate Credentials File
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
