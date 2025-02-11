@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.2
+# Version:          1.0.3
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -120,6 +120,8 @@ domain_exists() {
 check_dns() {
     local domain=$1
     local domain_ip=$(dig +short "$domain" | grep -v "\.$" | head -n1)
+    local server_ipv4=$(curl -s4 ifconfig.me)
+    local server_ipv6=$(curl -s6 ifconfig.me)
 
     if [ -z "$domain_ip" ]; then
         echo "⚠️  No DNS record found for $domain"
@@ -128,34 +130,39 @@ check_dns() {
         echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
-        echo "Value: $SERVER_IP"
+        echo "Value: $server_ipv4"
         echo ""
-        echo "For IPv6 (if supported):"
-        echo "Type: AAAA"
-        echo "Name: $domain"
-        echo "Value: $(ip -6 addr show | grep inet6 | grep -v fe80 | awk '{print $2}' | cut -d'/' -f1 | head -n1)"
-        echo ""
+        if [ ! -z "$server_ipv6" ]; then
+            echo "For IPv6 (optional):"
+            echo "Type: AAAA"
+            echo "Name: $domain"
+            echo "Value: $server_ipv6"
+            echo ""
+        fi
         echo "Note: Either IPv4 or IPv6 record is sufficient"
         echo ""
         read -p "Press Enter to retry DNS check or Ctrl+C to exit..."
         check_dns "$domain"
-    elif [ "$domain_ip" != "$SERVER_IP" ]; then
+    elif [ "$domain_ip" != "$server_ipv4" ] && [ "$domain_ip" != "$server_ipv6" ]; then
         echo "⚠️  Warning: DNS record mismatch detected"
         echo "Domain IP: $domain_ip"
-        echo "Server IP: $SERVER_IP"
+        echo "Server IPv4: $server_ipv4"
+        [ ! -z "$server_ipv6" ] && echo "Server IPv6: $server_ipv6"
         echo ""
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
         echo "Otherwise, please update your DNS records:"
         echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
-        echo "Value: $SERVER_IP"
+        echo "Value: $server_ipv4"
         echo ""
-        echo "For IPv6 (if supported):"
-        echo "Type: AAAA"
-        echo "Name: $domain"
-        echo "Value: $(ip -6 addr show | grep inet6 | grep -v fe80 | awk '{print $2}' | cut -d'/' -f1 | head -n1)"
-        echo ""
+        if [ ! -z "$server_ipv6" ]; then
+            echo "For IPv6 (optional):"
+            echo "Type: AAAA"
+            echo "Name: $domain"
+            echo "Value: $server_ipv6"
+            echo ""
+        fi
         echo "Note: Either IPv4 or IPv6 record is sufficient"
         echo ""
         read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
