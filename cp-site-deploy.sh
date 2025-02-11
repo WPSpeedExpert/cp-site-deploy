@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.6
+# Version:          1.0.7
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -29,9 +29,6 @@ trap cleanup EXIT
 #===============================================
 # 1. SCRIPT CONFIGURATION
 #===============================================
-# Exit on error, undefined vars, and pipe failures
-# set -euo pipefail
-
 # Allow script to continue on errors for DNS check
 set +e  # Temporarily disable exit on error
 trap 'set -e' RETURN  # Re-enable exit on error when function returns
@@ -297,7 +294,7 @@ main_installation() {
         esac
     fi
 
-# 5.4 DNS Check
+    # 5.4 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
@@ -305,25 +302,17 @@ main_installation() {
     # Continue with site creation
     log_message "Starting site creation..."
 
-        # 5.5 Generate Credentials
-        #---------------------------------------
-        site_user=$(derive_siteuser "$domain")
-        site_pass=$(generate_password)
-        db_name=$site_user
-        db_user=$site_user
-        db_pass=$(generate_password)
+    # 5.5 Generate Credentials
+    #---------------------------------------
+    site_user=$(derive_siteuser "$domain")
+    site_pass=$(generate_password)
+    db_name=$site_user
+    db_user=$site_user
+    db_pass=$(generate_password)
 
-        # 5.6 Create Site
-        log_message "Creating PHP site for $domain..."
-        clpctl site:add:php \
-            --domainName="$domain" \
-            --phpVersion="$PHP_VERSION" \
-            --vhostTemplate="Generic" \
-            --siteUser="$site_user" \
-            --siteUserPassword="$site_pass" \
-            || error_exit "Failed to create site"
-
-    # Create site in CloudPanel
+    # 5.6 Create Site
+    #---------------------------------------
+    log_message "Creating PHP site for $domain..."
     clpctl site:add:php \
         --domainName="$domain" \
         --phpVersion="$PHP_VERSION" \
@@ -352,12 +341,15 @@ main_installation() {
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
-    # Cleanup
+# Cleanup and completion
+    #---------------------------------------
     log_message "Cleaning up temporary files..."
     cleanup
-
+    
+    log_message "Installation completed successfully!"
+    echo "Your site is ready at: https://$domain"
     return 0
-}
+} 
 
 #===============================================
 # 6. SCRIPT EXECUTION
@@ -375,3 +367,4 @@ fi
 
 # Run main installation
 main_installation
+
