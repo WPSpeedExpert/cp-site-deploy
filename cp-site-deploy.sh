@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.4
+# Version:          1.0.5
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -127,6 +127,7 @@ check_dns() {
         echo "⚠️  No DNS record found for $domain"
         echo ""
         echo "Please add DNS records in your DNS settings:"
+        echo ""
         echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
@@ -151,6 +152,7 @@ check_dns() {
         echo ""
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
         echo "Otherwise, please update your DNS records:"
+        echo ""
         echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
@@ -165,20 +167,26 @@ check_dns() {
         fi
         echo "Note: Either IPv4 or IPv6 record is sufficient"
         echo ""
-        read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
-        case $dns_override in
-            [Yy]*)
-                log_message "Proceeding with installation despite DNS mismatch..."
-                return 2  # Special return code for user override
-                ;;
-            *)
-                echo "Installation aborted. Please verify DNS settings and try again."
-                return 1  # Error return code
-                ;;
-        esac
+        while true; do
+            read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
+            case $dns_override in
+                [Yy]*)
+                    log_message "Proceeding with installation despite DNS mismatch..."
+                    return 0  # Changed to return 0 to continue script
+                    ;;
+                [Nn]*|"")
+                    echo "Installation aborted. Please verify DNS settings and try again."
+                    exit 1
+                    ;;
+                *)
+                    echo "Please answer y or n."
+                    ;;
+            esac
+        done
     fi
-    return 0  # Success return code
+    return 0
 }
+
 #===============================================
 # 4. CREDENTIALS MANAGEMENT
 #===============================================
@@ -286,7 +294,7 @@ main_installation() {
         esac
     fi
 
-    # 5.4 DNS Check
+# 5.4 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
