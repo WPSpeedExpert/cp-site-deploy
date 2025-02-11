@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.0
+# Version:          1.1.1
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -33,8 +33,9 @@ trap cleanup EXIT
 set +e  # Temporarily disable exit on error
 trap 'set -e' RETURN  # Re-enable exit on error when function returns
 
-# Get server IP
-SERVER_IP=$(curl -s ifconfig.me)
+# Get server IPs
+SERVER_IPV4=$(curl -s4 ifconfig.me)
+SERVER_IPV6=$(curl -s6 ifconfig.me)
 
 #===============================================
 # 2. UTILITY FUNCTIONS
@@ -121,31 +122,28 @@ domain_exists() {
 check_dns() {
     local domain=$1
     local domain_ip=$(dig +short "$domain" | grep -v "\.$" | head -n1)
-    local server_ipv4=$(curl -s4 ifconfig.me)
-    local server_ipv6=$(curl -s6 ifconfig.me)
 
     if [ -z "$domain_ip" ]; then
         echo "⚠️  No DNS record found for $domain"
         echo ""
         echo "Please add DNS records in your DNS settings:"
         echo ""
-        echo "For IPv4:"
         echo "Type: A"
         echo "Name: $domain"
-        echo "Value: $server_ipv4"
+        echo "Value: $SERVER_IPV4"
         echo ""
-        if [ ! -z "$server_ipv6" ]; then
+        if [ ! -z "$SERVER_IPV6" ]; then
             echo "For IPv6 (optional):"
             echo "Type: AAAA"
             echo "Name: $domain"
-            echo "Value: $server_ipv6"
+            echo "Value: $SERVER_IPV6"
             echo ""
         fi
-        echo "Note: Either IPv4 or IPv6 record is sufficient"
+        echo "Note: Only IPv4 record is sufficient"
         echo ""
         read -p "Press Enter to retry DNS check or Ctrl+C to exit..."
         check_dns "$domain"
-    elif [ "$domain_ip" != "$server_ipv4" ] && [ "$domain_ip" != "$server_ipv6" ]; then
+    elif [ "$domain_ip" != "$SERVER_IPV4" ] && [ "$domain_ip" != "$SERVER_IPV6" ]; then
         echo "⚠️  Warning: DNS record mismatch detected"
         echo "Domain IP: $domain_ip"
         echo ""
@@ -154,9 +152,9 @@ check_dns() {
         echo ""
         echo "Type: A"
         echo "Name: $domain"
-        echo "Value: $server_ipv4"
+        echo "Value: $SERVER_IPV4"
         echo ""
-        echo "Note: Only IPv4 record is required"
+        echo "Note: Only IPv4 record is sufficient"
         echo ""
         while true; do
             read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
@@ -195,8 +193,8 @@ generate_credentials() {
     cat > "$creds_file" << EOF
 Site 
 - - - - - - - - - - - - - -
-IP Address IPv4: $server_ipv4
-IP Address IPv6: $SERVER_IP
+IP Address IPv4: $SERVER_IPV4
+IP Address IPv6: $SERVER_IPV6
 Domain Name: https://$domain
 Site User: $site_user
 Password: $site_pass
@@ -260,20 +258,20 @@ main_installation() {
         fi
     fi
 
-    # 5.2 VHost Template Selection
+# 5.2 VHost Template Selection
     #---------------------------------------
     echo ""
     echo "Select VHost template:"
-    echo "1) Generic PHP"
-    echo "2) WordPress"
-    echo "3) WooCommerce"
+    echo "1) WordPress"
+    echo "2) WooCommerce"
+    echo "3) Generic PHP"
     echo "4) Show all available templates"
     read -p "Choose template (1-4, default: 1): " template_choice
 
     case ${template_choice:-1} in
-        1) VHOST_TEMPLATE="Generic" ;;
-        2) VHOST_TEMPLATE="WordPress" ;;
-        3) VHOST_TEMPLATE="WooCommerce" ;;
+        1) VHOST_TEMPLATE="WordPress" ;;
+        2) VHOST_TEMPLATE="WooCommerce" ;;
+        3) VHOST_TEMPLATE="Generic" ;;
         4)
             echo ""
             echo "Available templates:"
