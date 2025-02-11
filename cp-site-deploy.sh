@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.0
+# Version:          1.0.1
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -122,11 +122,36 @@ check_dns() {
     local domain_ip=$(dig +short "$domain" | grep -v "\.$" | head -n1)
 
     if [ -z "$domain_ip" ]; then
-        error_exit "No DNS record found for $domain"
-    fi
-
-    if [ "$domain_ip" != "$SERVER_IP" ]; then
-        error_exit "DNS record for $domain ($domain_ip) does not match server IP ($SERVER_IP)"
+        echo "⚠️  No DNS record found for $domain"
+        echo ""
+        echo "Please add an A record in your DNS settings:"
+        echo "Type: A"
+        echo "Name: $domain"
+        echo "IPv4: $SERVER_IP"
+        echo ""
+        read -p "Press Enter to retry DNS check or Ctrl+C to exit..."
+        check_dns "$domain"
+    elif [ "$domain_ip" != "$SERVER_IP" ]; then
+        echo "⚠️  Warning: DNS record mismatch detected"
+        echo "Domain IP: $domain_ip"
+        echo "Server IP: $SERVER_IP"
+        echo ""
+        echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
+        echo "Otherwise, please update your DNS A record:"
+        echo "Type: A"
+        echo "Name: $domain"
+        echo "IPv4: $SERVER_IP"
+        echo ""
+        read -p "Continue anyway? Only proceed if you're sure the DNS is correctly configured (y/N): " dns_override
+        case $dns_override in
+            [Yy]*)
+                log_message "Proceeding with installation despite DNS mismatch..."
+                ;;
+            *)
+                echo "Installation aborted. Please verify DNS settings and try again."
+                exit 0
+                ;;
+        esac
     fi
 }
 
@@ -220,16 +245,29 @@ main_installation() {
         echo "Invalid domain format. Please try again."
     done
 
-    # 5.3 Domain Checks
+    # 5.3 Domain Existence Check
     #---------------------------------------
     if domain_exists "$domain"; then
-        error_exit "Domain $domain already exists"
+        echo "Domain $domain already exists."
+        read -p "Do you want to delete the existing site and create a new one? (y/N): " delete_choice
+        case $delete_choice in
+            [Yy]*)
+                log_message "Deleting existing site..."
+                clpctl site:delete --domainName="$domain" --force || error_exit "Failed to delete existing site"
+                ;;
+            *)
+                echo "Installation aborted. Existing site was preserved."
+                exit 0
+                ;;
+        esac
     fi
 
+    # 5.4 DNS Check
+    #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
 
-    # 5.4 Generate Credentials
+    # 5.5 Generate Credentials
     #---------------------------------------
     site_user=$(derive_siteuser "$domain")
     site_pass=$(generate_password)
@@ -237,7 +275,7 @@ main_installation() {
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 5.5 Create Site
+    # 5.6 Create Site
     #---------------------------------------
     log_message "Creating PHP site for $domain..."
 
@@ -250,7 +288,7 @@ main_installation() {
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
 
-    # 5.6 Create Database
+    # 5.7 Create Database
     #---------------------------------------
     log_message "Creating database..."
     clpctl db:add \
@@ -260,13 +298,13 @@ main_installation() {
         --databaseUserPassword="$db_pass" \
         || error_exit "Failed to create database"
 
-    # 5.7 Install SSL Certificate
+    # 5.8 Install SSL Certificate
     #---------------------------------------
     log_message "Installing SSL certificate..."
     clpctl lets-encrypt:install:certificate --domainName="$domain" \
         || error_exit "Failed to install SSL certificate"
 
-    # 5.8 Generate Credentials File
+    # 5.9 Generate Credentials File
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
