@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.7
+# Version:          1.0.8
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
@@ -203,33 +203,36 @@ generate_credentials() {
     local creds_file="/home/$site_user/site_credentials.txt"
 
     cat > "$creds_file" << EOF
-Site ---------------------------
-IP Address: $SERVER_IP
-Domain Name: https://$domain
-Site User: $site_user
-Password: $site_pass
+Site Information
+--------------
+IP Address:   $SERVER_IP
+Domain:       https://$domain
+Site User:    $site_user
+Password:     $site_pass
 
-Database ---------------------------
-Host: 127.0.0.1
-Port: 3306
-Database Name: $db_name
-Database User Name: $db_user
-Database User Password: $db_pass
-------------------------------------
+Database Access
+--------------
+Host:         127.0.0.1
+Port:         3306
+DB Name:      $db_name
+DB User:      $db_user
+DB Password:  $db_pass
 
-Installation Date: $(date '+%Y-%m-%d %H:%M:%S')
-Document Root: /home/$site_user/htdocs/$domain
+Additional Information
+--------------
+Install Date: $(date '+%Y-%m-%d %H:%M:%S')
+Doc Root:     /home/$site_user/htdocs/$domain
 EOF
 
     chown "$site_user:$site_user" "$creds_file"
     chmod 600 "$creds_file"
 
     # Display credentials on screen
-    echo "Copy the credentials for the site:"
-    echo "----------------------------------------"
+    echo "Site Credentials"
+    echo "--------------"
     cat "$creds_file"
-    echo "----------------------------------------"
-    echo "Credentials file saved to: $creds_file"
+    echo ""
+    echo "Credentials saved to: $creds_file"
 }
 
 #===============================================
