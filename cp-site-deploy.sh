@@ -119,6 +119,7 @@ domain_exists() {
 #---------------------------------------
 check_dns() {
     local domain=$1
+    local dns_check_passed=false
     local domain_ip=$(dig +short "$domain" | grep -v "\.$" | head -n1)
     local server_ipv4=$(curl -s4 ifconfig.me)
     local server_ipv6=$(curl -s6 ifconfig.me)
@@ -172,19 +173,23 @@ check_dns() {
             case $dns_override in
                 [Yy]*)
                     log_message "Proceeding with installation despite DNS mismatch..."
-                    return 0  # Changed to return 0 to continue script
+                    dns_check_passed=true
+                    break
                     ;;
                 [Nn]*|"")
                     echo "Installation aborted. Please verify DNS settings and try again."
-                    exit 1
+                    return 1
                     ;;
                 *)
                     echo "Please answer y or n."
                     ;;
             esac
         done
+    else
+        dns_check_passed=true
     fi
-    return 0
+
+    $dns_check_passed && return 0 || return 1
 }
 
 #===============================================
@@ -297,7 +302,11 @@ main_installation() {
 # 5.4 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
-    check_dns "$domain"
+    if ! check_dns "$domain"; then
+        error_exit "DNS check failed. Please fix DNS records and try again."
+    fi
+
+    log_message "Starting site creation..."
 
     # 5.5 Generate Credentials
     #---------------------------------------
