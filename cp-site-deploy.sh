@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.0.5
+# Version:          1.0.6
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-11
 # Dependencies:     Debian 12, CloudPanel
