@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.1
+# Version:          1.1.2
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -149,6 +149,10 @@ check_dns() {
         echo ""
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
         echo "Otherwise, please update your DNS record:"
+        echo ""
+        echo "Type: AAAA"
+        echo "Name: $domain"
+        echo "Value: $SERVER_IPV6"
         echo ""
         echo "Type: A"
         echo "Name: $domain"
@@ -349,15 +353,23 @@ main_installation() {
         --databaseUserPassword="$db_pass" \
         || error_exit "Failed to create database"
 
-    # 5.9 Install SSL Certificate
+# 5.9 Install SSL Certificate
     #---------------------------------------
     log_message "Installing SSL certificate..."
-    clpctl lets-encrypt:install:certificate --domainName="$domain" \
-        || error_exit "Failed to install SSL certificate"
-
-    # 5.10 Generate Credentials File
-    #---------------------------------------
-    generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
+    if ! clpctl lets-encrypt:install:certificate --domainName="$domain"; then
+        if grep -q "too many certificates.*already issued" <<< "$(clpctl lets-encrypt:install:certificate --domainName="$domain" 2>&1)"; then
+            log_message "WARNING: Let's Encrypt rate limit reached"
+            echo ""
+            echo "⚠️  SSL Certificate installation skipped due to Let's Encrypt rate limit"
+            echo "This is a temporary restriction and will be lifted within 12-36 hours."
+            echo "You can install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            # Continue script execution
+        else
+            error_exit "Failed to install SSL certificate"
+        fi
+    fi
 
 # Cleanup and completion
     #---------------------------------------
