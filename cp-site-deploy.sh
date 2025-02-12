@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.5
+# Version:          1.1.6
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -324,7 +324,7 @@ main_installation() {
     # Continue with site creation
     log_message "Starting site creation..."
 
-    # 5.6 Generate Credentials
+# 5.6 Generate Credentials
     #---------------------------------------
     site_user=$(derive_siteuser "$domain")
     site_pass=$(generate_password)
@@ -332,23 +332,7 @@ main_installation() {
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 5.7 SSL Certificate Option
-    #---------------------------------------
-    echo ""
-    read -p "Install SSL certificate? (Y/n): " install_ssl
-    case ${install_ssl:-y} in
-        [Yy]*) SKIP_SSL=false ;;
-        [Nn]*) 
-            SKIP_SSL=true
-            log_message "SSL certificate installation will be skipped"
-            echo "You can install the SSL certificate later using:"
-            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-            echo ""
-            ;;
-        *) error_exit "Invalid choice" ;;
-    esac
-
-    # 5.8 Create Site
+    # 5.7 Create Site
     #---------------------------------------
     clpctl site:add:php \
         --domainName="$domain" \
@@ -358,7 +342,7 @@ main_installation() {
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
         
-# 5.9 Install SSL Certificate
+    # 5.8 Install SSL Certificate
     #---------------------------------------
     if [ "$SKIP_SSL" = true ]; then
         log_message "Skipping SSL certificate installation (user requested)"
@@ -373,7 +357,6 @@ main_installation() {
             echo "You can install the SSL certificate later using:"
             echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
             echo ""
-            # Continue script execution
         elif [[ $SSL_RESULT == *"error"* ]]; then
             log_message "WARNING: SSL Certificate installation failed"
             echo ""
@@ -383,11 +366,10 @@ main_installation() {
             echo "You can try to install the SSL certificate later using:"
             echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
             echo ""
-            # Continue script execution
         fi
     fi
 
-    # 5.10 Generate Credentials File
+    # 5.9 Generate Credentials File
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
@@ -399,7 +381,7 @@ main_installation() {
     log_message "Installation completed successfully!"
     echo "Your site is ready at: https://$domain"
     return 0
-    }
+}
 
 #===============================================
 # 6. SCRIPT EXECUTION
