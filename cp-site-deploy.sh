@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.3
+# Version:          1.1.4
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -290,7 +290,7 @@ main_installation() {
         *) error_exit "Invalid template selection" ;;
     esac
     
-    # 5.3 Domain Input
+# 5.3 Domain Input
     #---------------------------------------
     while true; do
         read -p "Enter domain (e.g., www.example.com): " domain
@@ -300,24 +300,23 @@ main_installation() {
         echo "Invalid domain format. Please try again."
     done
 
-    # 5.4 Domain Existence Check
+    # 5.4 SSL Certificate Option
     #---------------------------------------
-    if domain_exists "$domain"; then
-        echo "Domain $domain already exists."
-        read -p "Do you want to delete the existing site and create a new one? (y/N): " delete_choice
-        case $delete_choice in
-            [Yy]*)
-                log_message "Deleting existing site..."
-                clpctl site:delete --domainName="$domain" --force || error_exit "Failed to delete existing site"
-                ;;
-            *)
-                echo "Installation aborted. Existing site was preserved."
-                exit 0
-                ;;
-        esac
-    fi
+    echo ""
+    read -p "Install SSL certificate? (Y/n): " install_ssl
+    case ${install_ssl:-y} in
+        [Yy]*) SKIP_SSL=false ;;
+        [Nn]*) 
+            SKIP_SSL=true
+            log_message "SSL certificate installation will be skipped"
+            echo "You can install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            ;;
+        *) error_exit "Invalid choice" ;;
+    esac
 
-    # 5.5 DNS Check
+# 5.5 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
@@ -333,7 +332,23 @@ main_installation() {
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 5.7 Create Site
+    # 5.7 SSL Certificate Option
+    #---------------------------------------
+    echo ""
+    read -p "Install SSL certificate? (Y/n): " install_ssl
+    case ${install_ssl:-y} in
+        [Yy]*) SKIP_SSL=false ;;
+        [Nn]*) 
+            SKIP_SSL=true
+            log_message "SSL certificate installation will be skipped"
+            echo "You can install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            ;;
+        *) error_exit "Invalid choice" ;;
+    esac
+
+    # 5.8 Create Site
     #---------------------------------------
     clpctl site:add:php \
         --domainName="$domain" \
@@ -342,40 +357,34 @@ main_installation() {
         --siteUser="$site_user" \
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
-
-    # 5.8 Create Database
+        
+# 5.9 Install SSL Certificate
     #---------------------------------------
-    log_message "Creating database..."
-    clpctl db:add \
-        --domainName="$domain" \
-        --databaseName="$db_name" \
-        --databaseUserName="$db_user" \
-        --databaseUserPassword="$db_pass" \
-        || error_exit "Failed to create database"
-
-    # 5.9 Install SSL Certificate
-    #---------------------------------------
-    log_message "Installing SSL certificate..."
-    SSL_RESULT=$(clpctl lets-encrypt:install:certificate --domainName="$domain" 2>&1)
-    if [[ $SSL_RESULT == *"Too Many Requests"* ]] || [[ $SSL_RESULT == *"rateLimited"* ]]; then
-        log_message "WARNING: Let's Encrypt rate limit reached"
-        echo ""
-        echo "⚠️  SSL Certificate installation skipped due to Let's Encrypt rate limit"
-        echo "This is a temporary restriction and will be lifted within 12-36 hours."
-        echo "You can install the SSL certificate later using:"
-        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-        echo ""
-        # Continue script execution
-    elif [[ $SSL_RESULT == *"error"* ]]; then
-        log_message "WARNING: SSL Certificate installation failed"
-        echo ""
-        echo "⚠️  SSL Certificate installation failed with error:"
-        echo "$SSL_RESULT"
-        echo ""
-        echo "You can try to install the SSL certificate later using:"
-        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-        echo ""
-        # Continue script execution
+    if [ "$SKIP_SSL" = true ]; then
+        log_message "Skipping SSL certificate installation (user requested)"
+    else
+        log_message "Installing SSL certificate..."
+        SSL_RESULT=$(clpctl lets-encrypt:install:certificate --domainName="$domain" 2>&1)
+        if [[ $SSL_RESULT == *"Too Many Requests"* ]] || [[ $SSL_RESULT == *"rateLimited"* ]]; then
+            log_message "WARNING: Let's Encrypt rate limit reached"
+            echo ""
+            echo "⚠️  SSL Certificate installation skipped due to Let's Encrypt rate limit"
+            echo "This is a temporary restriction and will be lifted within 12-36 hours."
+            echo "You can install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            # Continue script execution
+        elif [[ $SSL_RESULT == *"error"* ]]; then
+            log_message "WARNING: SSL Certificate installation failed"
+            echo ""
+            echo "⚠️  SSL Certificate installation failed with error:"
+            echo "$SSL_RESULT"
+            echo ""
+            echo "You can try to install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            # Continue script execution
+        fi
     fi
 
     # 5.10 Generate Credentials File
