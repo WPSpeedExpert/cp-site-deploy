@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.2
+# Version:          1.1.3
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -353,25 +353,36 @@ main_installation() {
         --databaseUserPassword="$db_pass" \
         || error_exit "Failed to create database"
 
-# 5.9 Install SSL Certificate
+    # 5.9 Install SSL Certificate
     #---------------------------------------
     log_message "Installing SSL certificate..."
-    if ! clpctl lets-encrypt:install:certificate --domainName="$domain"; then
-        if grep -q "too many certificates.*already issued" <<< "$(clpctl lets-encrypt:install:certificate --domainName="$domain" 2>&1)"; then
-            log_message "WARNING: Let's Encrypt rate limit reached"
-            echo ""
-            echo "⚠️  SSL Certificate installation skipped due to Let's Encrypt rate limit"
-            echo "This is a temporary restriction and will be lifted within 12-36 hours."
-            echo "You can install the SSL certificate later using:"
-            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-            echo ""
-            # Continue script execution
-        else
-            error_exit "Failed to install SSL certificate"
-        fi
+    SSL_RESULT=$(clpctl lets-encrypt:install:certificate --domainName="$domain" 2>&1)
+    if [[ $SSL_RESULT == *"Too Many Requests"* ]] || [[ $SSL_RESULT == *"rateLimited"* ]]; then
+        log_message "WARNING: Let's Encrypt rate limit reached"
+        echo ""
+        echo "⚠️  SSL Certificate installation skipped due to Let's Encrypt rate limit"
+        echo "This is a temporary restriction and will be lifted within 12-36 hours."
+        echo "You can install the SSL certificate later using:"
+        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+        echo ""
+        # Continue script execution
+    elif [[ $SSL_RESULT == *"error"* ]]; then
+        log_message "WARNING: SSL Certificate installation failed"
+        echo ""
+        echo "⚠️  SSL Certificate installation failed with error:"
+        echo "$SSL_RESULT"
+        echo ""
+        echo "You can try to install the SSL certificate later using:"
+        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+        echo ""
+        # Continue script execution
     fi
 
-# Cleanup and completion
+    # 5.10 Generate Credentials File
+    #---------------------------------------
+    generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
+
+    # Cleanup and completion
     #---------------------------------------
     log_message "Cleaning up temporary files..."
     cleanup
@@ -379,7 +390,6 @@ main_installation() {
     log_message "Installation completed successfully!"
     echo "Your site is ready at: https://$domain"
     return 0
-} 
 
 #===============================================
 # 6. SCRIPT EXECUTION
