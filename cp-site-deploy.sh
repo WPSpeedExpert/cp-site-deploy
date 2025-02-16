@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.6
+# Version:          1.1.7
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -180,10 +180,31 @@ check_dns() {
 }
 
 #===============================================
-# 4. CREDENTIALS MANAGEMENT
+# 4. DATABASE MANAGEMENT
 #===============================================
 
-# 4.1. Generate Credentials File
+# 4.1. Create Database and User
+#---------------------------------------
+create_database() {
+    local db_name=$1
+    local db_user=$2
+    local db_pass=$3
+
+    log_message "Creating database and user..."
+    
+    clpctl db:add \
+        --domainName="$domain" \
+        --databaseName="$db_name" \
+        --databaseUserName="$db_user" \
+        --databaseUserPassword="$db_pass" \
+        || error_exit "Failed to create database"
+}
+
+#===============================================
+# 5. CREDENTIALS MANAGEMENT
+#===============================================
+
+# 5.1. Generate Credentials File
 #---------------------------------------
 generate_credentials() {
     local domain=$1
@@ -228,7 +249,7 @@ EOF
 }
 
 #===============================================
-# 5. MAIN INSTALLATION FUNCTION
+# 6. MAIN INSTALLATION FUNCTION
 #===============================================
 
 main_installation() {
@@ -262,7 +283,7 @@ main_installation() {
         fi
     fi
 
-# 5.2 VHost Template Selection
+# 6.2 VHost Template Selection
     #---------------------------------------
     echo ""
     echo "Select VHost template:"
@@ -290,7 +311,7 @@ main_installation() {
         *) error_exit "Invalid template selection" ;;
     esac
     
-# 5.3 Domain Input
+# 6.3 Domain Input
     #---------------------------------------
     while true; do
         read -p "Enter domain (e.g., www.example.com): " domain
@@ -300,7 +321,7 @@ main_installation() {
         echo "Invalid domain format. Please try again."
     done
 
-    # 5.4 SSL Certificate Option
+    # 6.4 SSL Certificate Option
     #---------------------------------------
     echo ""
     read -p "Install SSL certificate? (Y/n): " install_ssl
@@ -316,7 +337,7 @@ main_installation() {
         *) error_exit "Invalid choice" ;;
     esac
 
-# 5.5 DNS Check
+# 6.5 DNS Check
     #---------------------------------------
     echo "Checking DNS records..."
     check_dns "$domain"
@@ -324,7 +345,7 @@ main_installation() {
     # Continue with site creation
     log_message "Starting site creation..."
 
-# 5.6 Generate Credentials
+# 6.6 Generate Credentials
     #---------------------------------------
     site_user=$(derive_siteuser "$domain")
     site_pass=$(generate_password)
@@ -332,7 +353,7 @@ main_installation() {
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 5.7 Create Site
+    # 6.7 Create Site
     #---------------------------------------
     clpctl site:add:php \
         --domainName="$domain" \
@@ -341,8 +362,13 @@ main_installation() {
         --siteUser="$site_user" \
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
+
+    # 6.8 Create Database
+    #---------------------------------------
+    log_message "Creating database..."
+    create_database "$db_name" "$db_user" "$db_pass"
         
-    # 5.8 Install SSL Certificate
+    # 6.9 Install SSL Certificate
     #---------------------------------------
     if [ "$SKIP_SSL" = true ]; then
         log_message "Skipping SSL certificate installation (user requested)"
@@ -369,7 +395,7 @@ main_installation() {
         fi
     fi
 
-    # 5.9 Generate Credentials File
+    # 6.10 Generate Credentials File
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
@@ -384,7 +410,7 @@ main_installation() {
 }
 
 #===============================================
-# 6. SCRIPT EXECUTION
+# 7. SCRIPT EXECUTION
 #===============================================
 
 # Check if running as root
