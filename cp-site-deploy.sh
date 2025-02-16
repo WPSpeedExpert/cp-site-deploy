@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.8
+# Version:          1.1.9
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -358,21 +358,30 @@ while true; do
     fi
 done
 
-    # 6.4 SSL Certificate Option
-    #---------------------------------------
-    echo ""
-    read -p "Install SSL certificate? (Y/n): " install_ssl
-    case ${install_ssl:-y} in
-        [Yy]*) SKIP_SSL=false ;;
-        [Nn]*) 
-            SKIP_SSL=true
-            log_message "SSL certificate installation will be skipped"
-            echo "You can install the SSL certificate later using:"
-            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-            echo ""
-            ;;
-        *) error_exit "Invalid choice" ;;
-    esac
+# 6.4 SSL Certificate Option
+#---------------------------------------
+echo ""
+read -p "Install SSL certificate? (Y/n): " install_ssl
+case ${install_ssl:-y} in
+    [Yy]*) 
+        SKIP_SSL=false
+        # 6.5 DNS Check (only when installing SSL)
+        #---------------------------------------
+        echo "Checking DNS records..."
+        check_dns "$domain"
+        ;;
+    [Nn]*) 
+        SKIP_SSL=true
+        log_message "SSL certificate installation will be skipped"
+        echo "You can install the SSL certificate later using:"
+        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+        echo ""
+        ;;
+    *) error_exit "Invalid choice" ;;
+esac
+
+# Continue with site creation
+log_message "Starting site creation..."
 
 # 6.5 DNS Check
     #---------------------------------------
