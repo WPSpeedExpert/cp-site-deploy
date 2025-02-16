@@ -2,7 +2,7 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.7
+# Version:          1.1.8
 # Author:           OctaHexa Media LLC
 # Last Modified:    2025-02-12
 # Dependencies:     Debian 12, CloudPanel
@@ -312,14 +312,51 @@ main_installation() {
     esac
     
 # 6.3 Domain Input
-    #---------------------------------------
-    while true; do
-        read -p "Enter domain (e.g., www.example.com): " domain
-        if validate_domain "$domain"; then
-            break
-        fi
+#---------------------------------------
+while true; do
+    read -p "Enter domain (e.g., www.example.com): " domain
+    if ! validate_domain "$domain"; then
         echo "Invalid domain format. Please try again."
-    done
+        continue
+    fi
+
+    # Use our proven domain_exists check
+    if domain_exists "$domain"; then
+        echo ""
+        echo "⚠️  Domain $domain already exists!"
+        echo ""
+        echo "Options:"
+        echo "1) Abort installation (default)"
+        echo "2) Enter different domain name"
+        echo "3) Delete existing site and continue"
+        read -p "Choose option (1-3, default: 1): " domain_choice
+        
+        case ${domain_choice:-1} in
+            1|"")
+                error_exit "Installation aborted by user"
+                ;;
+            2)
+                continue
+                ;;
+            3)
+                log_message "Deleting existing site..."
+                if clpctl site:delete --domainName="$domain" --force; then
+                    log_message "Existing site deleted successfully"
+                    break
+                else
+                    error_exit "Failed to delete existing site"
+                fi
+                ;;
+            *)
+                echo "Invalid choice. Please try again."
+                continue
+                ;;
+        esac
+    else
+        # Domain doesn't exist, proceed with installation
+        break
+    fi
+done
 
     # 6.4 SSL Certificate Option
     #---------------------------------------
