@@ -2,9 +2,9 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.1.9
+# Version:          1.2.0
 # Author:           OctaHexa Media LLC
-# Last Modified:    2025-02-12
+# Last Modified:    2025-02-26
 # Dependencies:     Debian 12, CloudPanel
 #
 # Installation:     Run this one-line command:
@@ -92,9 +92,34 @@ validate_domain() {
 #---------------------------------------
 derive_siteuser() {
     local domain=$1
-    local main_domain=$(echo "$domain" | awk -F. '{print $(NF-1)}')
-    local subdomain=$(echo "$domain" | awk -F. '{print $1}')
-
+    
+    # Handle compound TLDs (.co.uk, .co.za, etc.)
+    # Extract domain parts
+    IFS='.' read -ra DOMAIN_PARTS <<< "$domain"
+    local num_parts=${#DOMAIN_PARTS[@]}
+    
+    # Get subdomain (first part) and determine if it's www
+    local subdomain=${DOMAIN_PARTS[0]}
+    
+    # Identify the main domain name part (excluding TLD)
+    local main_domain=""
+    
+    # Handle compound TLDs with known patterns
+    if (( num_parts >= 3 )) && [[ "${DOMAIN_PARTS[-2]}" == "co" || 
+                                 "${DOMAIN_PARTS[-2]}" == "com" || 
+                                 "${DOMAIN_PARTS[-2]}" == "org" || 
+                                 "${DOMAIN_PARTS[-2]}" == "net" || 
+                                 "${DOMAIN_PARTS[-2]}" == "gov" || 
+                                 "${DOMAIN_PARTS[-2]}" == "edu" ]]; then
+        # This is likely a compound TLD like .co.za, .co.uk, .com.au
+        # Main domain is the third from the end
+        main_domain=${DOMAIN_PARTS[num_parts-3]}
+    else
+        # Standard TLD, main domain is second from the end
+        main_domain=${DOMAIN_PARTS[num_parts-2]}
+    fi
+    
+    # Generate site user based on subdomain and main domain
     if [[ "$subdomain" == "www" || "$subdomain" == "$main_domain" ]]; then
         echo "$main_domain"
     else
@@ -471,4 +496,3 @@ fi
 
 # Run main installation
 main_installation
-
