@@ -2,9 +2,9 @@
 # =========================================================================== #
 # Script Name:      cp-site-deploy.sh
 # Description:      Automated PHP site creation for CloudPanel
-# Version:          1.2.0
+# Version:          1.2.1
 # Author:           OctaHexa Media LLC
-# Last Modified:    2025-02-26
+# Last Modified:    2025-04-03
 # Dependencies:     Debian 12, CloudPanel
 #
 # Installation:     Run this one-line command:
@@ -175,14 +175,16 @@ check_dns() {
         echo "If you're using Cloudflare Proxy (orange cloud), this is expected."
         echo "Otherwise, please update your DNS record:"
         echo ""
-        echo "Type: AAAA"
-        echo "Name: $domain"
-        echo "Value: $SERVER_IPV6"
-        echo ""
         echo "Type: A"
         echo "Name: $domain"
         echo "Value: $SERVER_IPV4"
         echo ""
+        if [ ! -z "$SERVER_IPV6" ]; then
+            echo "Type: AAAA"
+            echo "Name: $domain"
+            echo "Value: $SERVER_IPV6"
+            echo ""
+        fi
         echo "Note: Only IPv4 record is sufficient"
         echo ""
         while true; do
@@ -284,7 +286,7 @@ main_installation() {
     echo "========================================="
     echo ""
 
-    # 5.1 PHP Version Selection
+    # 6.1 PHP Version Selection
     #---------------------------------------
     local php_versions=($(get_php_versions))
     local latest_version=$(get_latest_php_version)
@@ -308,7 +310,7 @@ main_installation() {
         fi
     fi
 
-# 6.2 VHost Template Selection
+    # 6.2 VHost Template Selection
     #---------------------------------------
     echo ""
     echo "Select VHost template:"
@@ -336,95 +338,84 @@ main_installation() {
         *) error_exit "Invalid template selection" ;;
     esac
     
-# 6.3 Domain Input
-#---------------------------------------
-while true; do
-    read -p "Enter domain (e.g., www.example.com): " domain
-    if ! validate_domain "$domain"; then
-        echo "Invalid domain format. Please try again."
-        continue
-    fi
-
-    # Use our proven domain_exists check
-    if domain_exists "$domain"; then
-        echo ""
-        echo "⚠️  Domain $domain already exists!"
-        echo ""
-        echo "Options:"
-        echo "1) Abort installation (default)"
-        echo "2) Enter different domain name"
-        echo "3) Delete existing site and continue"
-        read -p "Choose option (1-3, default: 1): " domain_choice
-        
-        case ${domain_choice:-1} in
-            1|"")
-                error_exit "Installation aborted by user"
-                ;;
-            2)
-                continue
-                ;;
-            3)
-                log_message "Deleting existing site..."
-                if clpctl site:delete --domainName="$domain" --force; then
-                    log_message "Existing site deleted successfully"
-                    break
-                else
-                    error_exit "Failed to delete existing site"
-                fi
-                ;;
-            *)
-                echo "Invalid choice. Please try again."
-                continue
-                ;;
-        esac
-    else
-        # Domain doesn't exist, proceed with installation
-        break
-    fi
-done
-
-# 6.4 SSL Certificate Option
-#---------------------------------------
-echo ""
-read -p "Install SSL certificate? (Y/n): " install_ssl
-case ${install_ssl:-y} in
-    [Yy]*) 
-        SKIP_SSL=false
-        # 6.5 DNS Check (only when installing SSL)
-        #---------------------------------------
-        echo "Checking DNS records..."
-        check_dns "$domain"
-        ;;
-    [Nn]*) 
-        SKIP_SSL=true
-        log_message "SSL certificate installation will be skipped"
-        echo "You can install the SSL certificate later using:"
-        echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
-        echo ""
-        ;;
-    *) error_exit "Invalid choice" ;;
-esac
-
-# Continue with site creation
-log_message "Starting site creation..."
-
-# 6.5 DNS Check
+    # 6.3 Domain Input
     #---------------------------------------
-    echo "Checking DNS records..."
-    check_dns "$domain"
-    
-    # Continue with site creation
+    while true; do
+        read -p "Enter domain (e.g., www.example.com): " domain
+        if ! validate_domain "$domain"; then
+            echo "Invalid domain format. Please try again."
+            continue
+        fi
+
+        # Use our proven domain_exists check
+        if domain_exists "$domain"; then
+            echo ""
+            echo "⚠️  Domain $domain already exists!"
+            echo ""
+            echo "Options:"
+            echo "1) Abort installation (default)"
+            echo "2) Enter different domain name"
+            echo "3) Delete existing site and continue"
+            read -p "Choose option (1-3, default: 1): " domain_choice
+            
+            case ${domain_choice:-1} in
+                1|"")
+                    error_exit "Installation aborted by user"
+                    ;;
+                2)
+                    continue
+                    ;;
+                3)
+                    log_message "Deleting existing site..."
+                    if clpctl site:delete --domainName="$domain" --force; then
+                        log_message "Existing site deleted successfully"
+                        break
+                    else
+                        error_exit "Failed to delete existing site"
+                    fi
+                    ;;
+                *)
+                    echo "Invalid choice. Please try again."
+                    continue
+                    ;;
+            esac
+        else
+            # Domain doesn't exist, proceed with installation
+            break
+        fi
+    done
+
+    # 6.4 SSL Certificate Option and DNS Check
+    #---------------------------------------
+    echo ""
+    read -p "Install SSL certificate? (Y/n): " install_ssl
+    case ${install_ssl:-y} in
+        [Yy]*) 
+            SKIP_SSL=false
+            # DNS Check (only when installing SSL)
+            echo "Checking DNS records..."
+            check_dns "$domain"
+            ;;
+        [Nn]*) 
+            SKIP_SSL=true
+            log_message "SSL certificate installation will be skipped"
+            echo "You can install the SSL certificate later using:"
+            echo "clpctl lets-encrypt:install:certificate --domainName=$domain"
+            echo ""
+            ;;
+        *) error_exit "Invalid choice" ;;
+    esac
+
+    # 6.5 Generate Credentials
+    #---------------------------------------
     log_message "Starting site creation..."
-
-# 6.6 Generate Credentials
-    #---------------------------------------
     site_user=$(derive_siteuser "$domain")
     site_pass=$(generate_password)
     db_name=$site_user
     db_user=$site_user
     db_pass=$(generate_password)
 
-    # 6.7 Create Site
+    # 6.6 Create Site
     #---------------------------------------
     clpctl site:add:php \
         --domainName="$domain" \
@@ -434,12 +425,12 @@ log_message "Starting site creation..."
         --siteUserPassword="$site_pass" \
         || error_exit "Failed to create site"
 
-    # 6.8 Create Database
+    # 6.7 Create Database
     #---------------------------------------
     log_message "Creating database..."
     create_database "$db_name" "$db_user" "$db_pass"
         
-    # 6.9 Install SSL Certificate
+    # 6.8 Install SSL Certificate
     #---------------------------------------
     if [ "$SKIP_SSL" = true ]; then
         log_message "Skipping SSL certificate installation (user requested)"
@@ -466,11 +457,11 @@ log_message "Starting site creation..."
         fi
     fi
 
-    # 6.10 Generate Credentials File
+    # 6.9 Generate Credentials File
     #---------------------------------------
     generate_credentials "$domain" "$site_user" "$site_pass" "$db_name" "$db_user" "$db_pass"
 
-    # Cleanup and completion
+    # 6.10 Cleanup and completion
     #---------------------------------------
     log_message "Cleaning up temporary files..."
     cleanup
