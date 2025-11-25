@@ -12,7 +12,7 @@ wget -qO /tmp/cp-site-deploy.sh https://raw.githubusercontent.com/WPSpeedExpert/
 
 ## Prerequisites
 
-- Debian 12
+- Debian 12/13
 - CloudPanel installed
 - Root access
 - Valid DNS records pointing to your server
@@ -70,4 +70,4 @@ GPL 3 License - See LICENSE file for details
 
 ## Author
 
-OctaHexa Media LLC - [https://octahexa.com](https://octahexa.com)
+OctaGorilla - [https://octagorilla.com](https://octagorilla.com)
